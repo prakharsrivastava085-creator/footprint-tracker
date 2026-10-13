@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Footprint Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#13161f;--border:#2d3149;
+  --text:#e2e8f0;--muted:#8892a4;--accent:#6366f1;--danger:#ef4444;
+  --warn:#f59e0b;--success:#22c55e;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;display:flex;height:100vh;overflow:hidden}
+a{color:var(--accent)}
+button{cursor:pointer;font-family:inherit;font-size:13px}
+input,select,textarea{font-family:inherit;font-size:13px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2d3149;border-radius:3px}
+
+/* ── Sidebar ── */
+#sidebar{width:200px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface2);border-right:1px solid var(--border)}
+.sidebar-logo{padding:24px 20px 12px;border-bottom:1px solid var(--border)}
+.sidebar-logo .logo-row{display:flex;align-items:center;gap:8px}
+.sidebar-logo .icon{color:var(--accent);font-size:20px}
+.sidebar-logo .name{font-weight:600;font-size:14px}
+.sidebar-logo .sub{font-size:10px;color:var(--muted);margin-top:2px}
+nav{flex:1;padding:8px}
+nav button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:none;background:transparent;color:var(--muted);border-radius:8px;text-align:left;transition:all .15s}
+nav button:hover{background:var(--border);color:var(--text)}
+nav button.active{background:rgba(99,102,241,.18);color:#a5b4fc}
+nav button .nav-icon{font-size:15px;line-height:1}
+.sidebar-foot{padding:12px 20px;border-top:1px solid var(--border)}
+.sidebar-foot p{font-size:10px;color:var(--muted)}
+.online-dot{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--success);margin-top:4px}
+.online-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block}
+
+/* ── Main ── */
+#main{flex:1;overflow-y:auto}
+.page{display:none;padding:24px;max-width:1100px}
+.page.active{display:block}
+.page-header{margin-bottom:20px}
+.page-header h1{font-size:20px;font-weight:600}
+.page-header p{color:var(--muted);font-size:13px;margin-top:2px}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-sm{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+
+/* ── Grid helpers ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:900px){.grid4{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+
+/* ── Buttons ── */
+.btn{padding:7px 14px;border-radius:8px;border:none;font-weight:500;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#4f46e5}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);background:var(--border)}
+.btn-danger{background:rgba(239,68,68,.15);color:#f87171;border:none}.btn-danger:hover{background:rgba(239,68,68,.3)}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:6px}
+
+/* ── Form ── */
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;outline:none;transition:border-color .15s}
+.input:focus{border-color:var(--accent)}
+.input::placeholder{color:var(--muted)}
+select.input option{background:var(--surface)}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-high{background:rgba(239,68,68,.18);color:#f87171}
+.badge-med{background:rgba(245,158,11,.18);color:#fbbf24}
+.badge-low{background:rgba(34,197,94,.18);color:#4ade80}
+.badge-info{background:rgba(99,102,241,.18);color:#a5b4fc}
+.badge-manual{background:rgba(99,102,241,.18);color:#a5b4fc}
+.badge-csv{background:rgba(6,182,212,.18);color:#22d3ee}
+.badge-gmail{background:rgba(234,67,53,.18);color:#f87171}
+
+/* ── Table ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:10px 14px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)}
+.tbl td{padding:10px 14px;border-bottom:1px solid rgba(45,49,73,.5)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(45,49,73,.25)}
+
+/* ── Gauge ── */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center}
+.gauge-wrap svg{overflow:visible}
+.gauge-label{font-size:10px;color:var(--muted);margin-top:4px}
+
+/* ── Risk bar ── */
+.risk-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;flex:1}
+.risk-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+
+/* ── Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border)}
+.modal-header h2{font-size:15px;font-weight:600}
+.modal-close{background:transparent;border:none;color:var(--muted);font-size:20px;line-height:1;padding:0 4px}.modal-close:hover{color:var(--text)}
+.modal-body{padding:20px}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* ── Autocomplete ── */
+.autocomplete{position:relative}
+.autocomplete-list{display:none;position:absolute;z-index:200;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.autocomplete-list.open{display:block}
+.autocomplete-item{padding:8px 12px;cursor:pointer;font-size:13px}
+.autocomplete-item:hover{background:var(--border)}
+.autocomplete-item span{color:var(--muted);font-size:11px;margin-left:6px}
+
+/* ── Progress bar ── */
+.progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:6px 0}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+
+/* ── Alert ── */
+.alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:12px}
+.alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#4ade80}
+.alert-danger{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171}
+.alert-info{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);color:#a5b4fc}
+.alert-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fbbf24}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;margin-bottom:16px}
+.tab{padding:5px 14px;border-radius:20px;border:none;font-size:12px;font-weight:500;background:var(--border);color:var(--muted);transition:all .15s}
+.tab.active{background:var(--accent);color:#fff}
+.tab:hover:not(.active){color:var(--text)}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty .empty-icon{font-size:40px;margin-bottom:12px}
+.empty p{font-size:13px}
+
+/* ── Stat card ── */
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+.stat-card .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.stat-card .stat-val{font-size:28px;font-weight:700;margin:4px 0 2px}
+.stat-card .stat-sub{font-size:11px;color:var(--muted)}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;min-width:220px;box-shadow:0 4px 24px rgba(0,0,0,.4);animation:slideIn .2s ease;pointer-events:auto}
+.toast-item.t-success{border-color:rgba(34,197,94,.4);color:#4ade80}
+.toast-item.t-error{border-color:rgba(239,68,68,.4);color:#f87171}
+.toast-item.t-info{border-color:rgba(99,102,241,.4);color:#a5b4fc}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:8px}.gap-3{gap:12px}.flex-1{flex:1}.flex-wrap{flex-wrap:wrap}
+.mt-1{margin-top:4px}.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mt-4{margin-top:16px}.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}
+.text-sm{font-size:12px}.text-muted{color:var(--muted)}.text-danger{color:var(--danger)}.text-success{color:var(--success)}.text-warn{color:var(--warn)}.text-accent{color:var(--accent)}
+.font-bold{font-weight:700}.font-med{font-weight:500}
+.w-full{width:100%}.min-w-0{min-width:0}.truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hidden{display:none!important}
+.space-y>*+*{margin-top:10px}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════ -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-row"><span class="icon">◉</span><span class="name">Footprint</span></div>
+    <div class="sub">Privacy Tracker</div>
+  </div>
+  <nav>
+    <button class="active" data-page="dashboard"><span class="nav-icon">◈</span>Dashboard</button>
+    <button data-page="services"><span class="nav-icon">⊞</span>My Accounts</button>
+    <button data-page="scan"><span class="nav-icon">⟳</span>Scan / Import</button>
+    <button data-page="requests"><span class="nav-icon">✉</span>Requests</button>
+    <button data-page="settings"><span class="nav-icon">⚙</span>Settings</button>
+  </nav>
+  <div class="sidebar-foot">
+    <p>All data stored locally</p>
+    <span class="online-dot">Local-first</span>
+  </div>
+</aside>
+
+<!-- ════════════════════════════════════════════
+     MAIN AREA
+════════════════════════════════════════════ -->
+<div id="main">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Your digital footprint at a glance</p>
+    </div>
+    <div class="grid4" id="dash-stats"></div>
+    <div class="grid2 mt-4">
+      <div class="card"><h2 style="font-size:13px;font-weight:600;margin-bottom:12px">Accounts by Category</h2><canvas id="chart-cat" height="200"></canvas></div>
+      <div class="card"><h2 style="font-size:13px;font-weight:600;margin-bottom:12px">Risk Distribution</h2><canvas id="chart-risk" height="200"></canvas></div>
+    </div>
+    <div class="grid2 mt-4">
+      <div class="card" id="dash-top-risk"><h2 style="font-size:13px;font-weight:600;margin-bottom:12px">Highest Risk Accounts</h2><div id="dash-top-risk-list"></div></div>
+      <div class="card" id="dash-breaches-card"><h2 style="font-size:13px;font-weight:600;margin-bottom:12px">Recent Breaches</h2><div id="dash-breaches-list"></div></div>
+    </div>
+  </div>
+
+  <!-- SERVICES / MY ACCOUNTS -->
+  <div class="page" id="page-services">
+    <div class="page-header flex items-center justify-between">
+      <div><h1>My Accounts</h1><p id="svc-count">0 services tracked</p></div>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm" onclick="importCSVClick()">⇪ Import CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⇩ Export</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add Account</button>
+      </div>
+    </div>
+    <div class="flex gap-2 flex-wrap mb-3">
+      <input class="input" id="svc-search" placeholder="Search services…" oninput="renderServices()" style="max-width:240px">
+      <select class="input" id="svc-cat" onchange="renderServices()" style="width:auto">
+        <option value="">All Categories</option>
+        <option>Finance</option><option>Health</option><option>Social Media</option>
+        <option>Shopping</option><option>Entertainment</option><option>Work</option>
+        <option>Email</option><option>Cloud Storage</option><option>Government</option><option>Other</option>
+      </select>
+      <select class="input" id="svc-sort" onchange="renderServices()" style="width:auto">
+        <option value="risk">Sort: Risk</option>
+        <option value="name">Sort: Name</option>
+        <option value="date">Sort: Newest</option>
+      </select>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="tbl">
+        <thead><tr>
+          <th>Service</th><th>Category</th><th>Email</th><th>Source</th><th>Risk</th><th>Breaches</th><th style="text-align:right">Actions</th>
+        </tr></thead>
+        <tbody id="svc-tbody"></tbody>
+      </table>
+      <div id="svc-empty" class="empty hidden"><div class="empty-icon">◈</div><p>No accounts yet. Add one manually or import a CSV.</p></div>
+    </div>
+  </div>
+
+  <!-- SCAN / IMPORT -->
+  <div class="page" id="page-scan">
+    <div class="page-header"><h1>Scan &amp; Import</h1><p>Import accounts via CSV and check for data breaches</p></div>
+    <div class="space-y" style="max-width:620px">
+
+      <div class="card">
+        <div class="flex items-center gap-3 mb-3"><span style="font-size:22px">📂</span>
+          <div><h2 style="font-size:14px;font-weight:600">Import from CSV</h2>
+          <p class="text-sm text-muted">Upload a CSV with columns: name, domain, category, email, date_joined</p></div>
+        </div>
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVFile(this)">
+        <button class="btn btn-primary" onclick="document.getElementById('csv-file-input').click()">Choose CSV File</button>
+        <div id="csv-result" class="mt-3 hidden"></div>
+        <div class="mt-3 card-sm" style="background:var(--bg)">
+          <p class="text-sm font-med mb-1">Expected CSV format:</p>
+          <code style="font-size:11px;color:var(--muted);white-space:pre">name,domain,category,email,date_joined
+Google,google.com,Email,you@gmail.com,2015-01-01
+Facebook,facebook.com,Social Media,you@gmail.com,2016-03-15</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex items-center gap-3 mb-3"><span style="font-size:22px">⚠️</span>
+          <div><h2 style="font-size:14px;font-weight:600">Breach Check (HIBP)</h2>
+          <p class="text-sm text-muted">Check your emails against Have I Been Pwned</p></div>
+        </div>
+        <div class="form-group"><label>Email to check</label><input class="input" id="hibp-email" type="email" placeholder="you@example.com"></div>
+        <div class="form-group"><label>HIBP API Key <span class="text-muted">(free at haveibeenpwned.com/API/Key)</span></label><input class="input" id="hibp-key" type="password" placeholder="Paste your API key…"></div>
+        <button class="btn btn-primary" onclick="checkHIBP()">Check for Breaches</button>
+        <div id="hibp-result" class="mt-3 hidden"></div>
+      </div>
+
+      <div class="card" style="background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.3)">
+        <h3 style="font-size:13px;font-weight:600;color:#a5b4fc;margin-bottom:6px">🔒 Privacy guarantee</h3>
+        <p class="text-sm text-muted">All data is stored in your browser's localStorage — nothing leaves your device. The only outbound call is to HIBP when you explicitly run a breach check using your own API key.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUESTS -->
+  <div class="page" id="page-requests">
+    <div class="page-header flex items-center justify-between">
+      <div><h1>Deletion Requests</h1><p id="req-summary">Track your GDPR/CCPA deletion requests</p></div>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm" onclick="exportRequests()">⇩ Export</button>
+        <button class="btn btn-primary btn-sm" onclick="openNewRequest()">+ New Request</button>
+      </div>
+    </div>
+    <div id="req-create-panel" class="card mb-3 hidden">
+      <h3 style="font-size:13px;font-weight:600;margin-bottom:10px">Select account to delete</h3>
+      <div id="req-account-list" class="space-y"></div>
+    </div>
+    <div class="tabs" id="req-tabs">
+      <button class="tab active" data-status="all" onclick="filterRequests(this)">All</button>
+      <button class="tab" data-status="pending" onclick="filterRequests(this)">Pending</button>
+      <button class="tab" data-status="sent" onclick="filterRequests(this)">Sent</button>
+      <button class="tab" data-status="completed" onclick="filterRequests(this)">Completed</button>
+      <button class="tab" data-status="declined" onclick="filterRequests(this)">Declined</button>
+    </div>
+    <div id="req-list" class="space-y"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="page" id="page-settings">
+    <div class="page-header"><h1>Settings</h1><p>App info and data management</p></div>
+    <div style="max-width:620px" class="space-y">
+      <div class="card">
+        <h2 style="font-size:14px;font-weight:600;margin-bottom:12px">About</h2>
+        <div class="grid2">
+          <div class="card-sm" style="background:var(--bg)"><p class="text-sm text-muted">Version</p><p class="font-med mt-1">1.0.0</p></div>
+          <div class="card-sm" style="background:var(--bg)"><p class="text-sm text-muted">Storage</p><p class="font-med mt-1">Browser localStorage</p></div>
+          <div class="card-sm" style="background:var(--bg)"><p class="text-sm text-muted">Network</p><p class="font-med mt-1">HIBP only (opt-in)</p></div>
+          <div class="card-sm" style="background:var(--bg)"><p class="text-sm text-muted">Accounts stored</p><p class="font-med mt-1" id="settings-count">0</p></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2 style="font-size:14px;font-weight:600;margin-bottom:10px">HIBP API Key</h2>
+        <p class="text-sm text-muted mb-2">Get a free key at <a href="https://haveibeenpwned.com/API/Key" target="_blank">haveibeenpwned.com/API/Key</a>. It's saved only in your browser.</p>
+        <div class="flex gap-2">
+          <input class="input flex-1" id="settings-hibp-key" type="password" placeholder="Paste key here…">
+          <button class="btn btn-primary" onclick="saveHibpKey()">Save</button>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(239,68,68,.3)">
+        <h2 style="font-size:14px;font-weight:600;color:#f87171;margin-bottom:8px">Danger Zone</h2>
+        <p class="text-sm text-muted mb-2">Permanently wipes all tracked accounts, breaches, and requests from localStorage.</p>
+        <button class="btn btn-danger" onclick="wipeAll()">Wipe All Data</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#main -->
+
+<!-- ════════ ADD / EDIT ACCOUNT MODAL ════════ -->
+<div class="modal-overlay" id="modal-account">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-account-title">Add Account</h2>
+      <button class="modal-close" onclick="closeModal('modal-account')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="modal-edit-id">
+      <div class="form-group autocomplete">
+        <label>Service Name *</label>
+        <input class="input" id="modal-name" placeholder="e.g. Google, Netflix…" autocomplete="off" oninput="onNameInput(this.value)">
+        <div class="autocomplete-list" id="autocomplete-list"></div>
+      </div>
+      <div class="form-group"><label>Domain</label><input class="input" id="modal-domain" placeholder="e.g. google.com"></div>
+      <div class="form-group"><label>Category</label>
+        <select class="input" id="modal-cat">
+          <option>Other</option><option>Finance</option><option>Health</option><option>Social Media</option>
+          <option>Shopping</option><option>Entertainment</option><option>Work</option>
+          <option>Email</option><option>Cloud Storage</option><option>Government</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Email used</label><input class="input" id="modal-email" type="email" placeholder="you@example.com"></div>
+      <div class="form-group"><label>Date joined</label><input class="input" id="modal-date" type="date"></div>
+      <div class="form-group"><label>Notes</label><textarea class="input" id="modal-notes" rows="2" placeholder="Optional…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-account')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAccount()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ BREACH DRAWER MODAL ════════ -->
+<div class="modal-overlay" id="modal-breach">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h2 id="modal-breach-title">Breaches</h2>
+      <button class="modal-close" onclick="closeModal('modal-breach')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-breach-body"></div>
+  </div>
+</div>
+
+<!-- ════════ TEMPLATE MODAL ════════ -->
+<div class="modal-overlay" id="modal-template">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h2 id="modal-template-title">Deletion Request Email</h2>
+      <button class="modal-close" onclick="closeModal('modal-template')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs" id="template-tabs">
+        <button class="tab active" onclick="switchTemplate(this,'gdpr')">GDPR</button>
+        <button class="tab" onclick="switchTemplate(this,'ccpa')">CCPA</button>
+        <button class="tab" onclick="switchTemplate(this,'general')">General</button>
+      </div>
+      <textarea class="input" id="template-text" rows="16" style="font-size:12px;font-family:monospace;resize:vertical"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="copyTemplate()">Copy</button>
+      <button class="btn btn-primary btn-sm" onclick="openMailtoFromTemplate()">Open in Mail ✉</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ TOAST ════════ -->
+<div id="toast"></div>
+
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  DATA LAYER  (localStorage)
+// ══════════════════════════════════════════════════════════════════
+const DB = {
+  load(key, def=[]) { try { return JSON.parse(localStorage.getItem(key)) ?? def; } catch { return def; } },
+  save(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+};
+
+function getAccounts()  { return DB.load('fp_accounts',  []); }
+function saveAccounts(a){ DB.save('fp_accounts', a); }
+function getBreaches()  { return DB.load('fp_breaches',  []); }
+function saveBreaches(b){ DB.save('fp_breaches', b); }
+function getRequests()  { return DB.load('fp_requests',  []); }
+function saveRequests(r){ DB.save('fp_requests', r); }
+function getHibpKey()   { return localStorage.getItem('fp_hibp_key') || ''; }
+
+function nextId(arr) { return arr.length ? Math.max(...arr.map(x=>x.id)) + 1 : 1; }
+
+// ── Risk scoring ──────────────────────────────────────────────────
+const CAT_RISK = { Finance:25, Health:25, Government:20, 'Social Media':15, Email:20, 'Cloud Storage':15, Work:15, Shopping:10, Entertainment:5, Other:5 };
+const SENSITIVE = ['Passwords','Credit cards','SSN','Bank account numbers','Health data'];
+
+function calcRisk(account) {
+  const breaches = getBreaches().filter(b => b.account_id === account.id);
+  let score = 30 + (CAT_RISK[account.category] || 5);
+  score += Math.min(breaches.length * 15, 45);
+  for (const b of breaches) {
+    const cls = b.data_classes || [];
+    if (cls.some(c => SENSITIVE.includes(c))) score += 10;
+  }
+  return Math.min(100, Math.round(score));
+}
+
+function recalcAllRisk() {
+  const accounts = getAccounts().map(a => ({ ...a, risk_score: calcRisk(a) }));
+  saveAccounts(accounts);
+}
+
+// ── Known services catalogue ──────────────────────────────────────
+const SERVICES = [
+  {name:'Google',domain:'google.com',category:'Email',risk:'high'},
+  {name:'Gmail',domain:'gmail.com',category:'Email',risk:'high'},
+  {name:'Facebook',domain:'facebook.com',category:'Social Media',risk:'high'},
+  {name:'Instagram',domain:'instagram.com',category:'Social Media',risk:'high'},
+  {name:'Twitter / X',domain:'twitter.com',category:'Social Media',risk:'medium'},
+  {name:'TikTok',domain:'tiktok.com',category:'Social Media',risk:'high'},
+  {name:'Snapchat',domain:'snapchat.com',category:'Social Media',risk:'medium'},
+  {name:'Reddit',domain:'reddit.com',category:'Social Media',risk:'medium'},
+  {name:'LinkedIn',domain:'linkedin.com',category:'Work',risk:'medium'},
+  {name:'YouTube',domain:'youtube.com',category:'Entertainment',risk:'medium'},
+  {name:'Netflix',domain:'netflix.com',category:'Entertainment',risk:'low'},
+  {name:'Spotify',domain:'spotify.com',category:'Entertainment',risk:'low'},
+  {name:'Twitch',domain:'twitch.tv',category:'Entertainment',risk:'low'},
+  {name:'Steam',domain:'steampowered.com',category:'Entertainment',risk:'medium'},
+  {name:'Epic Games',domain:'epicgames.com',category:'Entertainment',risk:'medium'},
+  {name:'Amazon',domain:'amazon.com',category:'Shopping',risk:'high'},
+  {name:'eBay',domain:'ebay.com',category:'Shopping',risk:'medium'},
+  {name:'Etsy',domain:'etsy.com',category:'Shopping',risk:'medium'},
+  {name:'PayPal',domain:'paypal.com',category:'Finance',risk:'high'},
+  {name:'Revolut',domain:'revolut.com',category:'Finance',risk:'high'},
+  {name:'Coinbase',domain:'coinbase.com',category:'Finance',risk:'high'},
+  {name:'Binance',domain:'binance.com',category:'Finance',risk:'high'},
+  {name:'Stripe',domain:'stripe.com',category:'Finance',risk:'high'},
+  {name:'Dropbox',domain:'dropbox.com',category:'Cloud Storage',risk:'medium'},
+  {name:'iCloud',domain:'icloud.com',category:'Cloud Storage',risk:'medium'},
+  {name:'OneDrive',domain:'onedrive.live.com',category:'Cloud Storage',risk:'medium'},
+  {name:'GitHub',domain:'github.com',category:'Work',risk:'medium'},
+  {name:'Slack',domain:'slack.com',category:'Work',risk:'medium'},
+  {name:'Notion',domain:'notion.so',category:'Work',risk:'low'},
+  {name:'Zoom',domain:'zoom.us',category:'Work',risk:'medium'},
+  {name:'Microsoft',domain:'microsoft.com',category:'Work',risk:'medium'},
+  {name:'Apple',domain:'apple.com',category:'Other',risk:'medium'},
+  {name:'Airbnb',domain:'airbnb.com',category:'Other',risk:'medium'},
+  {name:'Uber',domain:'uber.com',category:'Other',risk:'medium'},
+  {name:'NHS',domain:'nhs.uk',category:'Health',risk:'high'},
+  {name:'Zocdoc',domain:'zocdoc.com',category:'Health',risk:'high'},
+  {name:'HMRC',domain:'hmrc.gov.uk',category:'Government',risk:'high'},
+  {name:'GOV.UK',domain:'gov.uk',category:'Government',risk:'high'},
+  {name:'Pinterest',domain:'pinterest.com',category:'Social Media',risk:'low'},
+  {name:'Disney+',domain:'disneyplus.com',category:'Entertainment',risk:'low'},
+  {name:'PlayStation',domain:'playstation.com',category:'Entertainment',risk:'medium'},
+  {name:'Xbox',domain:'xbox.com',category:'Entertainment',risk:'medium'},
+  {name:'ASOS',domain:'asos.com',category:'Shopping',risk:'medium'},
+  {name:'Zalando',domain:'zalando.com',category:'Shopping',risk:'medium'},
+  {name:'Monzo',domain:'monzo.com',category:'Finance',risk:'high'},
+  {name:'GitLab',domain:'gitlab.com',category:'Work',risk:'medium'},
+  {name:'Trello',domain:'trello.com',category:'Work',risk:'low'},
+  {name:'Deliveroo',domain:'deliveroo.com',category:'Other',risk:'low'},
+];
+function riskScore(level){ return {high:80,medium:50,low:20}[level]||50; }
+
+// ══════════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════════════════════
+let currentPage = 'dashboard';
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const page = btn.dataset.page;
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    currentPage = page;
+    if (page === 'dashboard') renderDashboard();
+    if (page === 'services')  renderServices();
+    if (page === 'requests')  renderRequests();
+    if (page === 'settings')  renderSettings();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════════════════════
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = `toast-item t-${type}`;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════════════════════
+let catChart = null, riskChart = null;
+
+function renderDashboard() {
+  const accounts = getAccounts();
+  const breaches = getBreaches();
+  const total = accounts.length;
+  const breachSet = new Set(breaches.map(b => b.account_id));
+  const breachedCount = breachSet.size;
+  const avgRisk = total ? Math.round(accounts.reduce((s,a)=>s+a.risk_score,0)/total) : 0;
+  const fpScore = Math.max(0, Math.round(100 - avgRisk - breachedCount*4));
+
+  // Score colour
+  const sc = fpScore>=70?'var(--success)':fpScore>=40?'var(--warn)':'var(--danger)';
+  const sl = fpScore>=70?'Good':fpScore>=40?'Moderate':'At Risk';
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat-card" style="grid-column:span 1">
+      <div class="gauge-wrap">
+        <svg width="120" height="120" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" stroke-width="10" transform="rotate(-90 50 50)"/>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="${sc}" stroke-width="10"
+            stroke-dasharray="${(fpScore/100)*251.2} 251.2" stroke-linecap="round" transform="rotate(-90 50 50)"/>
+          <text x="50" y="46" text-anchor="middle" fill="${sc}" font-size="18" font-weight="700" dy="0">${fpScore}</text>
+          <text x="50" y="58" text-anchor="middle" fill="var(--muted)" font-size="8">${sl}</text>
+        </svg>
+        <div class="gauge-label">Privacy Score</div>
+      </div>
+    </div>
+    <div class="stat-card"><div class="stat-label">Total Accounts</div><div class="stat-val">${total}</div><div class="stat-sub">tracked services</div></div>
+    <div class="stat-card"><div class="stat-label">Breached Accounts</div><div class="stat-val" style="color:${breachedCount>0?'var(--danger)':'var(--success)'}">${breachedCount}</div><div class="stat-sub">${breachedCount>0?'action recommended':'no known breaches'}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Risk Score</div><div class="stat-val" style="color:${avgRisk>=60?'var(--danger)':avgRisk>=35?'var(--warn)':'var(--success)'}">${avgRisk}<span style="font-size:14px;color:var(--muted)">/100</span></div><div class="stat-sub">across all accounts</div></div>
+  `;
+
+  // Category chart
+  const catCounts = {};
+  accounts.forEach(a => { catCounts[a.category] = (catCounts[a.category]||0)+1; });
+  const cats = Object.keys(catCounts);
+  const COLORS = ['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6','#3b82f6','#f97316'];
+
+  if (catChart) catChart.destroy();
+  const catCtx = document.getElementById('chart-cat');
+  if (cats.length === 0) {
+    catCtx.parentElement.querySelector('canvas').style.display='none';
+    catCtx.parentElement.insertAdjacentHTML('beforeend','<div class="empty" style="padding:20px"><p>No accounts yet</p></div>');
+  } else {
+    catCtx.style.display='';
+    catChart = new Chart(catCtx, {
+      type:'doughnut',
+      data:{ labels:cats, datasets:[{ data:cats.map(c=>catCounts[c]), backgroundColor:COLORS, borderWidth:0 }] },
+      options:{ plugins:{ legend:{ labels:{ color:'#8892a4', font:{size:11} } } }, cutout:'60%' }
+    });
+  }
+
+  // Risk distribution chart
+  const riskBuckets = { High:0, Medium:0, Low:0 };
+  accounts.forEach(a => {
+    if (a.risk_score>=75) riskBuckets.High++;
+    else if (a.risk_score>=40) riskBuckets.Medium++;
+    else riskBuckets.Low++;
+  });
+  if (riskChart) riskChart.destroy();
+  riskChart = new Chart(document.getElementById('chart-risk'), {
+    type:'bar',
+    data:{ labels:['High','Medium','Low'], datasets:[{ data:[riskBuckets.High,riskBuckets.Medium,riskBuckets.Low], backgroundColor:['#ef4444','#f59e0b','#22c55e'], borderRadius:6, borderSkipped:false }] },
+    options:{ plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#8892a4' }, grid:{ color:'#2d3149' } }, y:{ ticks:{ color:'#8892a4', stepSize:1 }, grid:{ color:'#2d3149' } } } }
+  });
+
+  // Top risk
+  const topRisk = [...accounts].sort((a,b)=>b.risk_score-a.risk_score).slice(0,5);
+  document.getElementById('dash-top-risk-list').innerHTML = topRisk.length
+    ? topRisk.map(a=>`<div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div class="min-w-0"><p class="font-med truncate">${esc(a.name)}</p><p class="text-sm text-muted">${esc(a.category)} · ${esc(a.domain)}</p></div>
+        ${riskBadge(a.risk_score)}
+      </div>`).join('')
+    : '<div class="empty" style="padding:16px"><p>No accounts yet</p></div>';
+
+  // Recent breaches
+  const recentB = [...breaches].sort((a,b)=>b.id-a.id).slice(0,5);
+  document.getElementById('dash-breaches-list').innerHTML = recentB.length
+    ? recentB.map(b => {
+        const acct = accounts.find(a=>a.id===b.account_id);
+        return `<div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <div><p class="font-med">${esc(b.breach_name)}</p><p class="text-sm text-muted">${esc(acct?.name||'Unknown')} · ${esc(b.breach_date||'')}</p></div>
+          <span class="badge badge-high">Breach</span>
+        </div>`;
+      }).join('')
+    : '<div class="empty" style="padding:16px"><span style="font-size:28px">✓</span><p>No breaches recorded</p></div>';
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SERVICES PAGE
+// ══════════════════════════════════════════════════════════════════
+function renderServices() {
+  const accounts = getAccounts();
+  const breaches = getBreaches();
+  const q = document.getElementById('svc-search').value.toLowerCase();
+  const cat = document.getElementById('svc-cat').value;
+  const sort = document.getElementById('svc-sort').value;
+  document.getElementById('svc-count').textContent = `${accounts.length} services tracked`;
+
+  let list = accounts.filter(a => {
+    if (q && !a.name.toLowerCase().includes(q) && !a.domain.toLowerCase().includes(q)) return false;
+    if (cat && a.category !== cat) return false;
+    return true;
+  });
+  if (sort==='risk') list.sort((a,b)=>b.risk_score-a.risk_score);
+  else if (sort==='name') list.sort((a,b)=>a.name.localeCompare(b.name));
+  else list.sort((a,b)=>b.id-a.id);
+
+  const tbody = document.getElementById('svc-tbody');
+  const empty = document.getElementById('svc-empty');
+  if (!list.length) { tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  tbody.innerHTML = list.map(a => {
+    const bc = breaches.filter(b=>b.account_id===a.id).length;
+    return `<tr>
+      <td><p class="font-med">${esc(a.name)}</p><p class="text-sm text-muted">${esc(a.domain)}</p></td>
+      <td class="text-muted">${esc(a.category)}</td>
+      <td class="text-muted">${esc(a.email||'—')}</td>
+      <td><span class="badge badge-${a.source}">${a.source}</span></td>
+      <td>${riskBadge(a.risk_score)}</td>
+      <td>${bc>0?`<span class="badge badge-high">${bc} breach${bc>1?'es':''}</span>`:'<span class="text-muted">—</span>'}</td>
+      <td style="text-align:right">
+        <button class="btn btn-ghost btn-sm" onclick="openBreachModal(${a.id})">Breaches</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEditModal(${a.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAccount(${a.id})">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ACCOUNT MODAL
+// ══════════════════════════════════════════════════════════════════
+function openAddModal() {
+  document.getElementById('modal-account-title').textContent = 'Add Account';
+  document.getElementById('modal-edit-id').value = '';
+  ['modal-name','modal-domain','modal-email','modal-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('modal-cat').value='Other';
+  document.getElementById('modal-date').value='';
+  document.getElementById('autocomplete-list').classList.remove('open');
+  openModal('modal-account');
+}
+
+function openEditModal(id) {
+  const a = getAccounts().find(x=>x.id===id);
+  if (!a) return;
+  document.getElementById('modal-account-title').textContent = 'Edit Account';
+  document.getElementById('modal-edit-id').value = id;
+  document.getElementById('modal-name').value = a.name;
+  document.getElementById('modal-domain').value = a.domain;
+  document.getElementById('modal-cat').value = a.category;
+  document.getElementById('modal-email').value = a.email||'';
+  document.getElementById('modal-date').value = a.date_joined||'';
+  document.getElementById('modal-notes').value = a.notes||'';
+  document.getElementById('autocomplete-list').classList.remove('open');
+  openModal('modal-account');
+}
+
+let _acTimer = null;
+function onNameInput(val) {
+  clearTimeout(_acTimer);
+  const list = document.getElementById('autocomplete-list');
+  if (val.length < 2) { list.classList.remove('open'); return; }
+  _acTimer = setTimeout(() => {
+    const matches = SERVICES.filter(s => s.name.toLowerCase().includes(val.toLowerCase())).slice(0,8);
+    if (!matches.length) { list.classList.remove('open'); return; }
+    list.innerHTML = matches.map(s =>
+      `<div class="autocomplete-item" onclick="pickService(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+        ${esc(s.name)}<span>${esc(s.domain)} · ${esc(s.category)}</span>
+      </div>`
+    ).join('');
+    list.classList.add('open');
+  }, 200);
+}
+
+function pickService(s) {
+  document.getElementById('modal-name').value = s.name;
+  document.getElementById('modal-domain').value = s.domain;
+  document.getElementById('modal-cat').value = s.category;
+  document.getElementById('autocomplete-list').classList.remove('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.autocomplete')) document.getElementById('autocomplete-list').classList.remove('open');
+});
+
+function saveAccount() {
+  const id = document.getElementById('modal-edit-id').value;
+  const name = document.getElementById('modal-name').value.trim();
+  if (!name) { toast('Service name is required','error'); return; }
+  const domain = document.getElementById('modal-domain').value.trim();
+  const category = document.getElementById('modal-cat').value;
+  const email = document.getElementById('modal-email').value.trim();
+  const date_joined = document.getElementById('modal-date').value;
+  const notes = document.getElementById('modal-notes').value.trim();
+
+  // Look up known service for initial risk
+  const svc = SERVICES.find(s => s.domain===domain || s.name.toLowerCase()===name.toLowerCase());
+  const accounts = getAccounts();
+
+  if (id) {
+    const idx = accounts.findIndex(a=>a.id==id);
+    if (idx>-1) {
+      accounts[idx] = { ...accounts[idx], name, domain, category, email, date_joined, notes };
+      accounts[idx].risk_score = calcRisk(accounts[idx]);
+    }
+    toast('Account updated','success');
+  } else {
+    const newAcc = { id:nextId(accounts), name, domain, category, email, date_joined, notes, source:'manual', risk_score: riskScore(svc?.risk||'medium'), created_at:Date.now() };
+    newAcc.risk_score = calcRisk(newAcc);
+    accounts.push(newAcc);
+    toast('Account added','success');
+  }
+  saveAccounts(accounts);
+  closeModal('modal-account');
+  renderServices();
+  if (currentPage==='dashboard') renderDashboard();
+}
+
+function deleteAccount(id) {
+  if (!confirm('Delete this account and all its breach data?')) return;
+  saveAccounts(getAccounts().filter(a=>a.id!==id));
+  saveBreaches(getBreaches().filter(b=>b.account_id!==id));
+  saveRequests(getRequests().filter(r=>r.account_id!==id));
+  renderServices();
+  toast('Account deleted','info');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  BREACH MODAL
+// ══════════════════════════════════════════════════════════════════
+let _breachAccountId = null;
+
+function openBreachModal(accountId) {
+  _breachAccountId = accountId;
+  const account = getAccounts().find(a=>a.id===accountId);
+  if (!account) return;
+  document.getElementById('modal-breach-title').textContent = `Breaches — ${account.name}`;
+  renderBreachBody(accountId);
+  openModal('modal-breach');
+}
+
+function renderBreachBody(accountId) {
+  const breaches = getBreaches().filter(b=>b.account_id===accountId);
+  const account = getAccounts().find(a=>a.id===accountId);
+  const factors = [
+    {label:'Category', value:account.category, impact:['Finance','Health','Government','Email'].includes(account.category)?'High':'Medium'},
+    {label:'Breaches', value:breaches.length, impact:breaches.length>0?'High':'Low'},
+    {label:'Source', value:account.source, impact:'Info'},
+  ];
+
+  let html = `<p class="text-sm text-muted mb-3">Risk score: <strong style="color:${account.risk_score>=75?'var(--danger)':account.risk_score>=40?'var(--warn)':'var(--success)'}">${account.risk_score}/100</strong></p>
+  <div class="space-y mb-4">${factors.map(f=>`<div class="flex justify-between text-sm"><span class="text-muted">${f.label}</span><span>${f.value}</span></div>`).join('')}</div>
+  <h3 style="font-size:13px;font-weight:600;margin-bottom:8px">Recorded Breaches (${breaches.length})</h3>`;
+
+  if (!breaches.length) {
+    html += '<div class="alert alert-success">✓ No breaches recorded for this account</div>';
+  } else {
+    html += breaches.map(b=>`<div class="alert alert-danger mb-2">
+      <div class="flex justify-between"><strong>${esc(b.breach_name)}</strong><span class="text-sm">${esc(b.breach_date||'')}</span></div>
+      ${b.data_classes?.length ? `<div class="mt-1">${b.data_classes.map(c=>`<span class="badge badge-high" style="margin-right:3px">${esc(c)}</span>`).join('')}</div>` : ''}
+      ${b.description ? `<p class="text-sm mt-1" style="color:var(--muted)">${esc(b.description)}</p>` : ''}
+    </div>`).join('');
+  }
+
+  html += `<hr style="border-color:var(--border);margin:14px 0">
+  <h3 style="font-size:13px;font-weight:600;margin-bottom:8px">Add Breach Manually</h3>
+  <div class="form-group"><label>Breach Name</label><input class="input" id="new-breach-name" placeholder="e.g. LinkedIn 2021"></div>
+  <div class="form-group"><label>Date</label><input class="input" id="new-breach-date" type="date"></div>
+  <div class="form-group"><label>Data classes (comma-separated)</label><input class="input" id="new-breach-classes" placeholder="Passwords, Email addresses, Phone numbers"></div>
+  <div class="form-group"><label>Description (optional)</label><input class="input" id="new-breach-desc" placeholder="Brief description…"></div>
+  <button class="btn btn-primary btn-sm" onclick="addBreach(${accountId})">Add Breach</button>`;
+
+  document.getElementById('modal-breach-body').innerHTML = html;
+}
+
+function addBreach(accountId) {
+  const name = document.getElementById('new-breach-name').value.trim();
+  if (!name) { toast('Breach name required','error'); return; }
+  const breaches = getBreaches();
+  breaches.push({
+    id: nextId(breaches), account_id: accountId,
+    breach_name: name,
+    breach_date: document.getElementById('new-breach-date').value,
+    data_classes: document.getElementById('new-breach-classes').value.split(',').map(s=>s.trim()).filter(Boolean),
+    description: document.getElementById('new-breach-desc').value.trim(),
+  });
+  saveBreaches(breaches);
+  recalcAllRisk();
+  renderBreachBody(accountId);
+  renderServices();
+  toast('Breach recorded','success');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CSV IMPORT / EXPORT
+// ══════════════════════════════════════════════════════════════════
+function importCSVClick() {
+  // Navigate to scan page
+  document.querySelector('nav button[data-page="scan"]').click();
+}
+
+function handleCSVFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const result = parseAndImportCSV(e.target.result);
+    const el = document.getElementById('csv-result');
+    el.className = `alert ${result.added>0?'alert-success':'alert-info'}`;
+    el.textContent = `Parsed ${result.rows} rows · Added ${result.added} new accounts`;
+    el.classList.remove('hidden');
+    toast(`Imported ${result.added} accounts`, result.added>0?'success':'info');
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function parseAndImportCSV(raw) {
+  const lines = raw.replace(/\r/g,'').split('\n').filter(Boolean);
+  if (lines.length < 2) return { rows:0, added:0 };
+  const headers = lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const accounts = getAccounts();
+  let added = 0;
+
+  for (let i=1; i<lines.length; i++) {
+    const cols = splitCSV(lines[i]);
+    const row = {};
+    headers.forEach((h,j) => { row[h] = (cols[j]||'').trim().replace(/^"|"$/g,''); });
+
+    const name = row.name || row.service_name || row.service || '';
+    const domain = row.domain || extractDomain(row.url||row.website||'') || '';
+    if (!name && !domain) continue;
+    if (accounts.find(a => a.domain && a.domain===domain)) continue;
+
+    const svc = SERVICES.find(s=>s.domain===domain||s.name.toLowerCase()===name.toLowerCase());
+    const newAcc = {
+      id: nextId([...accounts, ...Array(added).fill({id:accounts.length+added})]),
+      name: name || domainToName(domain),
+      domain,
+      category: row.category || svc?.category || 'Other',
+      email: row.email || row.email_used || '',
+      date_joined: row.date_joined || row.date || '',
+      source: 'csv',
+      risk_score: riskScore(svc?.risk||'medium'),
+      notes: row.notes || '',
+      created_at: Date.now(),
+    };
+    newAcc.risk_score = calcRisk(newAcc);
+    accounts.push(newAcc);
+    added++;
+  }
+  saveAccounts(accounts);
+  return { rows: lines.length-1, added };
+}
+
+function exportCSV() {
+  const accounts = getAccounts();
+  if (!accounts.length) { toast('No accounts to export','info'); return; }
+  const header = 'id,name,domain,category,email,date_joined,source,risk_score,notes\n';
+  const body = accounts.map(a =>
+    [a.id, q(a.name), q(a.domain), q(a.category), q(a.email), q(a.date_joined), q(a.source), a.risk_score, q(a.notes)].join(',')
+  ).join('\n');
+  download('my-footprint.csv', header+body, 'text/csv');
+  toast('Exported CSV','success');
+}
+
+function exportRequests() {
+  const requests = getRequests();
+  if (!requests.length) { toast('No requests to export','info'); return; }
+  const header = 'id,service_name,method,status,sent_at,completed_at\n';
+  const body = requests.map(r =>
+    [r.id, q(r.service_name), q(r.method||'email'), q(r.status), q(r.sent_at||''), q(r.completed_at||'')].join(',')
+  ).join('\n');
+  download('deletion-requests.csv', header+body, 'text/csv');
+  toast('Exported CSV','success');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  HIBP BREACH CHECK
+// ══════════════════════════════════════════════════════════════════
+async function checkHIBP() {
+  const email = document.getElementById('hibp-email').value.trim();
+  const apiKey = document.getElementById('hibp-key').value.trim() || getHibpKey();
+  const resultEl = document.getElementById('hibp-result');
+
+  if (!email) { toast('Enter an email address','error'); return; }
+  if (!apiKey) { toast('Enter your HIBP API key','error'); return; }
+
+  resultEl.className='alert alert-info';
+  resultEl.textContent='Checking…';
+  resultEl.classList.remove('hidden');
+
+  try {
+    const resp = await fetch(`https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`, {
+      headers:{ 'hibp-api-key': apiKey, 'User-Agent':'FootprintTracker/1.0' }
+    });
+
+    if (resp.status===404) {
+      resultEl.className='alert alert-success';
+      resultEl.textContent='✓ No breaches found for this email address.';
+      return;
+    }
+    if (resp.status===401) { resultEl.className='alert alert-danger'; resultEl.textContent='Invalid API key.'; return; }
+    if (resp.status===429) { resultEl.className='alert alert-warn'; resultEl.textContent='Rate limited — wait a moment and try again.'; return; }
+
+    const data = await resp.json();
+    const breaches = getBreaches();
+    let added = 0;
+
+    // Find accounts that use this email
+    const matchedAccts = getAccounts().filter(a => a.email===email);
+
+    for (const b of data) {
+      for (const acct of matchedAccts) {
+        const exists = breaches.find(x=>x.account_id===acct.id && x.breach_name===b.Name);
+        if (!exists) {
+          breaches.push({ id:nextId(breaches), account_id:acct.id, breach_name:b.Name, breach_date:b.BreachDate, data_classes:b.DataClasses||[], description:b.Description||'' });
+          added++;
+        }
+      }
+      // If no account found for this email, add breach to a placeholder set
+    }
+    saveBreaches(breaches);
+    recalcAllRisk();
+
+    resultEl.className='alert alert-danger';
+    resultEl.innerHTML=`⚠ Found <strong>${data.length}</strong> breach${data.length>1?'es':''}: ${data.map(b=>`<strong>${esc(b.Name)}</strong>`).join(', ')}. ${added} linked to your accounts.`;
+    toast(`${data.length} breach(es) found`, 'error');
+  } catch(err) {
+    resultEl.className='alert alert-danger';
+    resultEl.textContent='Request failed: ' + err.message;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  DELETION REQUESTS
+// ══════════════════════════════════════════════════════════════════
+let _reqFilter = 'all';
+
+function renderRequests() {
+  const requests = getRequests();
+  const pending = requests.filter(r=>r.status==='pending').length;
+  const done = requests.filter(r=>r.status==='completed').length;
+  document.getElementById('req-summary').textContent = `${pending} pending · ${done} completed`;
+
+  const list = _reqFilter==='all' ? requests : requests.filter(r=>r.status===_reqFilter);
+  const el = document.getElementById('req-list');
+
+  if (!list.length) {
+    el.innerHTML='<div class="empty"><div class="empty-icon">✉</div><p>No deletion requests yet. Create one for any service you want to leave.</p></div>';
+    return;
+  }
+
+  const statusColors = { pending:'var(--warn)', sent:'var(--accent)', completed:'var(--success)', declined:'var(--danger)' };
+  el.innerHTML = list.slice().reverse().map(r=>`
+    <div class="card flex items-center gap-3">
+      <div class="flex-1 min-w-0">
+        <p class="font-med">${esc(r.service_name)}</p>
+        <p class="text-sm text-muted">
+          ${r.email||'No email'} · Created ${new Date(r.created_at).toLocaleDateString()}
+          ${r.sent_at ? ` · Sent ${new Date(r.sent_at).toLocaleDateString()}` : ''}
+          ${r.completed_at ? ` · Completed ${new Date(r.completed_at).toLocaleDateString()}` : ''}
+        </p>
+      </div>
+      <span class="badge" style="background:${statusColors[r.status]||'gray'}22;color:${statusColors[r.status]||'gray'};flex-shrink:0">${capitalize(r.status)}</span>
+      <div class="flex gap-2" style="flex-shrink:0">
+        ${r.status==='pending'?`<button class="btn btn-primary btn-sm" onclick="openTemplateModal(${r.id})">Draft Email</button>`:''}
+        ${r.status==='sent'?`<button class="btn btn-ghost btn-sm" onclick="updateReqStatus(${r.id},'completed')">Mark Done</button>`:''}
+        ${['pending','sent'].includes(r.status)?`<button class="btn btn-danger btn-sm" onclick="updateReqStatus(${r.id},'declined')">Cancel</button>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterRequests(btn) {
+  document.querySelectorAll('#req-tabs .tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  _reqFilter = btn.dataset.status;
+  renderRequests();
+}
+
+function openNewRequest() {
+  const panel = document.getElementById('req-create-panel');
+  if (!panel.classList.contains('hidden')) { panel.classList.add('hidden'); return; }
+  const accounts = getAccounts();
+  const requests = getRequests();
+  const active = requests.filter(r=>['pending','sent'].includes(r.status)).map(r=>r.account_id);
+  const available = accounts.filter(a=>!active.includes(a.id));
+
+  if (!available.length) { toast('All accounts have an active request','info'); return; }
+
+  document.getElementById('req-account-list').innerHTML = available.map(a=>`
+    <button class="btn btn-ghost w-full" style="text-align:left;display:flex;justify-content:space-between;align-items:center" onclick="createRequest(${a.id})">
+      <div><p class="font-med">${esc(a.name)}</p><p class="text-sm text-muted">${esc(a.domain)} · ${esc(a.email||'no email')}</p></div>
+      <span class="text-accent text-sm">Request →</span>
+    </button>
+  `).join('');
+  panel.classList.remove('hidden');
+}
+
+function createRequest(accountId) {
+  const account = getAccounts().find(a=>a.id===accountId);
+  if (!account) return;
+  const requests = getRequests();
+  requests.push({ id:nextId(requests), account_id:accountId, service_name:account.name, email:account.email||'', method:'email', status:'pending', created_at:Date.now() });
+  saveRequests(requests);
+  document.getElementById('req-create-panel').classList.add('hidden');
+  renderRequests();
+  toast('Request created','success');
+}
+
+function updateReqStatus(id, status) {
+  const requests = getRequests();
+  const idx = requests.findIndex(r=>r.id===id);
+  if (idx===-1) return;
+  requests[idx].status = status;
+  if (status==='sent') requests[idx].sent_at = Date.now();
+  if (status==='completed') requests[idx].completed_at = Date.now();
+  saveRequests(requests);
+  renderRequests();
+  toast(`Request marked ${status}`,'success');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  TEMPLATE MODAL
+// ══════════════════════════════════════════════════════════════════
+let _templateReqId = null;
+let _templateType = 'gdpr';
+
+const TEMPLATES = {
+  gdpr: (service, email) =>
+`Subject: Right to Erasure Request (GDPR Article 17) – ${email}
+
+Dear ${service} Data Protection Team,
+
+I am writing to exercise my right to erasure under Article 17 of the General Data Protection Regulation (GDPR).
+
+Please permanently delete all personal data you hold relating to my account:
+  • Email address: ${email}
+  • Any associated profile, usage, or behavioural data
+  • Any backup or archived copies
+
+Please confirm in writing within 30 days that you have complied with this request.
+
+Yours sincerely,
+[Your Full Name]
+[Date: ${new Date().toLocaleDateString()}]`,
+
+  ccpa: (service, email) =>
+`Subject: Right to Delete Request (CCPA §1798.105) – ${email}
+
+To Whom It May Concern at ${service},
+
+Pursuant to the California Consumer Privacy Act (CCPA), California Civil Code §1798.105, I hereby request the deletion of all personal information you have collected, retained, or sold relating to me.
+
+Account details:
+  • Email: ${email}
+
+Please confirm deletion within 45 days. If you intend to deny this request, please provide a full written explanation and the relevant legal basis.
+
+Thank you,
+[Your Full Name]`,
+
+  general: (service, email) =>
+`Subject: Account Deletion Request – ${email}
+
+Dear ${service} Support Team,
+
+I would like to permanently close my account and have all personal data deleted from your systems.
+
+Account email: ${email}
+
+Please confirm via email once the account and all associated data have been removed.
+
+Thank you,
+[Your Full Name]`,
+};
+
+function openTemplateModal(reqId) {
+  _templateReqId = reqId;
+  _templateType = 'gdpr';
+  const req = getRequests().find(r=>r.id===reqId);
+  if (!req) return;
+  document.getElementById('modal-template-title').textContent = `Deletion Email — ${req.service_name}`;
+  document.querySelectorAll('#template-tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===0));
+  document.getElementById('template-text').value = TEMPLATES.gdpr(req.service_name, req.email||'[your email]');
+  openModal('modal-template');
+}
+
+function switchTemplate(btn, type) {
+  _templateType = type;
+  document.querySelectorAll('#template-tabs .tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  const req = getRequests().find(r=>r.id===_templateReqId);
+  if (!req) return;
+  document.getElementById('template-text').value = TEMPLATES[type](req.service_name, req.email||'[your email]');
+}
+
+function copyTemplate() {
+  navigator.clipboard.writeText(document.getElementById('template-text').value)
+    .then(()=>toast('Copied to clipboard','success'))
+    .catch(()=>toast('Copy failed','error'));
+}
+
+function openMailtoFromTemplate() {
+  const req = getRequests().find(r=>r.id===_templateReqId);
+  if (!req) return;
+  const text = document.getElementById('template-text').value;
+  const lines = text.split('\n');
+  const subject = lines[0].replace(/^Subject:\s*/i,'');
+  const body = lines.slice(2).join('\n');
+  const guess = `privacy@${req.service_name.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,'')}.com`;
+  window.open(`mailto:${guess}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+  updateReqStatus(_templateReqId, 'sent');
+  closeModal('modal-template');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════════════════════════
+function renderSettings() {
+  document.getElementById('settings-count').textContent = getAccounts().length;
+  document.getElementById('settings-hibp-key').value = getHibpKey();
+}
+
+function saveHibpKey() {
+  const key = document.getElementById('settings-hibp-key').value.trim();
+  localStorage.setItem('fp_hibp_key', key);
+  toast('API key saved','success');
+}
+
+function wipeAll() {
+  if (!confirm('This will permanently delete ALL your tracked accounts, breaches, and requests. Are you sure?')) return;
+  localStorage.removeItem('fp_accounts');
+  localStorage.removeItem('fp_breaches');
+  localStorage.removeItem('fp_requests');
+  toast('All data wiped','info');
+  renderSettings();
+  renderDashboard();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MODAL HELPERS
+// ══════════════════════════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target===o) o.classList.remove('open'); });
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  UTILITIES
+// ══════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function riskBadge(score) {
+  if (score>=75) return `<span class="badge badge-high">${score}</span>`;
+  if (score>=40) return `<span class="badge badge-med">${score}</span>`;
+  return `<span class="badge badge-low">${score}</span>`;
+}
+function capitalize(s) { return s ? s[0].toUpperCase()+s.slice(1) : ''; }
+function q(val) { return `"${String(val||'').replace(/"/g,'""')}"`; }
+function download(filename, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type}));
+  a.download = filename;
+  a.click();
+}
+function domainToName(d) { const p=d.split('.')[0]; return p.charAt(0).toUpperCase()+p.slice(1); }
+function extractDomain(url) {
+  try { return new URL(url.startsWith('http')?url:'https://'+url).hostname.replace(/^www\./,''); }
+  catch { return url.replace(/^www\./,'').split('/')[0]; }
+}
+function splitCSV(line) {
+  const r=[]; let cur='', inq=false;
+  for (const ch of line) { if(ch==='"'){inq=!inq;} else if(ch===','&&!inq){r.push(cur);cur='';} else{cur+=ch;} }
+  r.push(cur); return r;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════════
+renderDashboard();
+renderServices();
+</script>
+</body>
+</html>
